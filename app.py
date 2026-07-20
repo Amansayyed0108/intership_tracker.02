@@ -125,6 +125,11 @@ def savesupervisors(sups_list, sups_path):
 
 @app.route("/")
 def home():
+    # --- ADD THESE TWO LINES HERE ---
+    session.permanent = True  # Tells the browser to save this session permanently
+    app.permanent_session_lifetime = 31536000 # Keeps it alive for 1 year (in seconds)
+    # --------------------------------
+    
     excel_file, supervisors_file = get_user_filepaths()
     initexcel(excel_file)
     
