@@ -1,7 +1,8 @@
-from flask import Flask, render_template, request, redirect, jsonify, send_file
+from flask import Flask, render_template, request, redirect, jsonify, send_file, session
 import pandas as pd
 import os
 import json
+import uuid
 
 # For Excel styling
 from openpyxl import load_workbook
@@ -12,8 +13,8 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 templatedir = os.path.join(basedir, 'templates')
 app = Flask(__name__, template_folder=templatedir)
 
-EXCELFILE = os.path.join(basedir, "internshiplog.xlsx")
-SUPERVISORSFILE = os.path.join(basedir, "supervisors.json")
+# Secret key required to use client-side sessions securely
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "super-secret-key-change-in-production")
 
 COLUMNS = [
     "Start Date",
@@ -26,15 +27,26 @@ COLUMNS = [
     "Supervisor"
 ]
 
-# Helper function to apply beautiful professional styling to the Excel file
-def styleexcel():
-    if not os.path.exists(EXCELFILE):
+# Helper function to grab unique user storage paths dynamically
+def get_user_filepaths():
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
+    
+    # Isolate storage for this specific visitor session
+    user_dir = os.path.join(basedir, "userdata", session['user_id'])
+    os.makedirs(user_dir, exist_ok=True)
+    
+    excel_file = os.path.join(user_dir, "internshiplog.xlsx")
+    supervisors_file = os.path.join(user_dir, "supervisors.json")
+    return excel_file, supervisors_file
+
+def styleexcel(excel_path):
+    if not os.path.exists(excel_path):
         return
 
-    wb = load_workbook(EXCELFILE)
+    wb = load_workbook(excel_path)
     ws = wb.active
 
-    # Theme Colors (Professional Dark Navy Blue / Clean White text)
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
     data_font = Font(name="Calibri", size=11, color="000000")
@@ -46,7 +58,6 @@ def styleexcel():
         bottom=Side(style='thin', color='D9D9D9')
     )
 
-    # Style Header Row
     for col_idx in range(1, len(COLUMNS) + 1):
         cell = ws.cell(row=1, column=col_idx)
         cell.fill = header_fill
@@ -54,25 +65,21 @@ def styleexcel():
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = thin_border
 
-    # Style Data Rows
     for row in range(2, ws.max_row + 1):
         for col in range(1, ws.max_column + 1):
             cell = ws.cell(row=row, column=col)
             cell.font = data_font
             cell.border = thin_border
 
-            # Center dates, status, hours and supervisor
             if col in [1, 2, 5, 6, 7, 8]:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
             else:
                 cell.alignment = Alignment(horizontal="left", vertical="center")
 
-    # Set custom row heights
-    ws.row_dimensions[1].height = 28  # Thicker header row
+    ws.row_dimensions[1].height = 28
     for r in range(2, ws.max_row + 1):
-        ws.row_dimensions[r].height = 20  # Comfortable reading height for data
+        ws.row_dimensions[r].height = 20
 
-    # Auto-adjust column widths cleanly based on data length
     for col in ws.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
@@ -80,62 +87,62 @@ def styleexcel():
             val = str(cell.value or '')
             if len(val) > max_len:
                 max_len = len(val)
-        # Prevent columns from becoming ridiculously wide for long descriptions
         clamped_width = min(max(max_len + 4, 12), 45)
         ws.column_dimensions[col_letter].width = clamped_width
 
-    wb.save(EXCELFILE)
+    wb.save(excel_path)
 
-# Ensure Excel file exists with correct headers
-def initexcel():
-    if not os.path.exists(EXCELFILE):
+def initexcel(excel_path):
+    if not os.path.exists(excel_path):
         df = pd.DataFrame(columns=COLUMNS)
-        df.to_excel(EXCELFILE, index=False)
-        styleexcel()
+        df.to_excel(excel_path, index=False)
+        styleexcel(excel_path)
     else:
         try:
-            df = pd.read_excel(EXCELFILE)
+            df = pd.read_excel(excel_path)
             for col in COLUMNS:
                 if col not in df.columns:
                     df[col] = ""
-            df.to_excel(EXCELFILE, index=False)
-            styleexcel()
+            df.to_excel(excel_path, index=False)
+            styleexcel(excel_path)
         except Exception:
             df = pd.DataFrame(columns=COLUMNS)
-            df.to_excel(EXCELFILE, index=False)
-            styleexcel()
+            df.to_excel(excel_path, index=False)
+            styleexcel(excel_path)
 
-initexcel()
-
-def loadsupervisors():
-    if os.path.exists(SUPERVISORSFILE):
+def loadsupervisors(sups_path):
+    if os.path.exists(sups_path):
         try:
-            with open(SUPERVISORSFILE, 'r') as f:
+            with open(sups_path, 'r') as f:
                 return json.load(f)
         except Exception:
             return []
     return []
 
-def savesupervisors(suplist):
-    with open(SUPERVISORSFILE, 'w') as f:
-        json.dump(suplist, f)
+def savesupervisors(sups_list, sups_path):
+    with open(sups_path, 'w') as f:
+        json.dump(sups_list, f)
 
 @app.route("/")
 def home():
-    df = pd.read_excel(EXCELFILE)
+    excel_file, supervisors_file = get_user_filepaths()
+    initexcel(excel_file)
+    
+    df = pd.read_excel(excel_file)
     for col in ["Start Date", "End Date"]:
         if col in df.columns:
             df[col] = df[col].astype(str).replace("NaT", "").replace("nan", "")
 
     logs = df.to_dict(orient="records")
-    # Zip data with its DataFrame raw index number to let us target it securely
     logs_with_index = list(enumerate(logs))
+    supervisors = loadsupervisors(supervisors_file)
     
-    supervisors = loadsupervisors()
     return render_template("index.html", logs=logs_with_index, supervisors=supervisors)
 
 @app.route("/save", methods=["POST"])
 def save():
+    excel_file, _ = get_user_filepaths()
+    
     row_index_str = request.form.get("row_index", "")
     start_date = request.form.get("start_date", "")
     end_date = request.form.get("end_date", "")
@@ -160,56 +167,60 @@ def save():
         "Supervisor": supervisor
     }
 
-    df = pd.read_excel(EXCELFILE)
+    df = pd.read_excel(excel_file)
 
-    # Check if this request is updating an existing entry
     if row_index_str != "":
         idx = int(row_index_str)
         if 0 <= idx < len(df):
-            # Replace row values directly at targeted index location
             for col in COLUMNS:
                 df.at[idx, col] = updated_row[col]
     else:
-        # Append new log row entry normally
         df = pd.concat([df, pd.DataFrame([updated_row])], ignore_index=True)
 
-    df.to_excel(EXCELFILE, index=False)
-    styleexcel()
+    df.to_excel(excel_file, index=False)
+    styleexcel(excel_file)
     return redirect("/")
 
 @app.route("/delete/row/<int:index>", methods=["POST"])
 def delete_row(index):
     try:
-        df = pd.read_excel(EXCELFILE)
+        excel_file, _ = get_user_filepaths()
+        df = pd.read_excel(excel_file)
         if 0 <= index < len(df):
             df = df.drop(index).reset_index(drop=True)
-            df.to_excel(EXCELFILE, index=False)
-            styleexcel()
+            df.to_excel(excel_file, index=False)
+            styleexcel(excel_file)
     except Exception as e:
         print(f"Error deleting row: {e}")
     return redirect("/")
 
 @app.route("/add_supervisor", methods=["POST"])
 def addsupervisor():
+    _, supervisors_file = get_user_filepaths()
     name = request.form.get("name", "").strip()
     if name:
-        sups = loadsupervisors()
+        sups = loadsupervisors(supervisors_file)
         if name not in sups:
             sups.append(name)
-            savesupervisors(sups)
+            savesupervisors(sups, supervisors_file)
     return redirect("/")
 
 @app.route("/delete/supervisor/<string:name>", methods=["POST"])
 def delete_supervisor(name):
-    sups = loadsupervisors()
+    _, supervisors_file = get_user_filepaths()
+    sups = loadsupervisors(supervisors_file)
     if name in sups:
         sups.remove(name)
-        savesupervisors(sups)
+        savesupervisors(sups, supervisors_file)
     return redirect("/")
 
 @app.route("/get_last_entry")
 def getlastentry():
-    df = pd.read_excel(EXCELFILE)
+    excel_file, _ = get_user_filepaths()
+    if not os.path.exists(excel_file):
+        return jsonify({})
+        
+    df = pd.read_excel(excel_file)
     if not df.empty:
         last_row = df.iloc[-1].fillna("").to_dict()
         return jsonify(last_row)
@@ -218,11 +229,13 @@ def getlastentry():
 @app.route("/open_excel")
 def openexcel():
     try:
-        if os.path.exists(EXCELFILE):
-            # Serves the clean Excel stream so the web viewer can read it remotely
+        excel_file, _ = get_user_filepaths()
+        if os.path.exists(excel_file):
             return send_file(
-                EXCELFILE,
-                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                excel_file,
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                as_attachment=True,
+                download_name="internshiplog.xlsx"
             )
         else:
             return "File not found", 404
@@ -231,8 +244,4 @@ def openexcel():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-
-app.run(
-    host="0.0.0.0",
-    port=port
-)
+    app.run(host="0.0.0.0", port=port)
