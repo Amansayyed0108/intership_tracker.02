@@ -325,19 +325,14 @@
     const currentDomain = window.location.origin;
     const downloadUrl = `${currentDomain}/open_excel`;
     
-    // 1. Force a direct download of the current session's live file in the background
+    // Create a hidden temporary link to trigger an authentic download from your current session
     const downloadAnchor = document.createElement('a');
     downloadAnchor.href = downloadUrl;
     downloadAnchor.download = 'internshiplog.xlsx';
+    
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     document.body.removeChild(downloadAnchor);
-
-    // 2. If you are hosted on a live server (not local), try opening it in the cloud viewer too
-    if (!currentDomain.includes("localhost") && !currentDomain.includes("127.0.0.1")) {
-        const webExcelUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(downloadUrl)}`;
-        window.open(webExcelUrl, '_blank');
-    }
 }
 
     async function copyYesterday() {
