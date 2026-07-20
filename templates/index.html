@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internship Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 py-10 px-4">
+
+<div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- Header Section -->
+    <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl border border-slate-200 shadow-sm gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-blue-600">Internship Tracker Dashboard</h1>
+            <p class="text-sm text-slate-500">Live updating to internship_log.xlsx</p>
+        </div>
+        <div class="flex flex-wrap gap-3">
+            <button type="button" onclick="openExcelSheet()" class="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm px-4 py-2.5 rounded-lg shadow-sm transition">
+                📊 Open Excel Sheet
+            </button>
+            <button type="button" onclick="copyYesterday()" class="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm px-4 py-2.5 rounded-lg shadow-sm transition">
+                ⚡ Copy Yesterday
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+        <!-- Left 2 Columns: The Core Logging Form -->
+        <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h2 id="form-title" class="text-lg font-semibold text-slate-900">Log Daily Work Details</h2>
+                <button type="button" id="cancel-edit-btn" onclick="resetLogForm()" class="hidden text-xs text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded">Cancel Edit</button>
+            </div>
+
+            <form action="/save" method="POST" id="log-form" class="space-y-4">
+                <!-- Hidden input to determine if we are editing an existing row -->
+                <input type="hidden" id="row_index" name="row_index" value="">
+
+                <!-- Dates -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Start Date</label>
+                        <input type="date" id="start_date" name="start_date" required class="w-full rounded-lg border border-slate-200 p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">End Date</label>
+                        <input type="date" id="end_date" name="end_date" required class="w-full rounded-lg border border-slate-200 p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+
+                <!-- Task Name -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Project / Task Name</label>
+                    <input type="text" id="task" name="task" required placeholder="What are you working on?" class="w-full rounded-lg border border-slate-200 p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Work Description / Learning Outcomes</label>
+                    <textarea id="description" name="description" rows="4" required placeholder="Summarize your tasks, analysis, and learnings here..." class="w-full rounded-lg border border-slate-200 p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"></textarea>
+                </div>
+
+                <!-- Row 3: Tool & Time Pickers -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Software / Tool Used</label>
+                        <select id="tool" name="tool" class="w-full rounded-lg border border-slate-200 p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                            <option value="HyperMesh">HyperMesh</option>
+                            <option value="HyperMesh/HyperView">HyperMesh/HyperView</option>
+                            <option value="HyperMesh/HyperGraph">HyperMesh/HyperGraph</option>
+                            <option value="HyperGraph/HyperView">HyperGraph/HyperView</option>
+                            <option value="HyperMesh/HyperView/HyperGraph">HyperMesh/HyperView/HyperGraph</option>
+                            <option value="HyperView">HyperView</option>
+                            <option value="HyperCrash">HyperCrash</option>
+                            <option value="HyperStudy">HyperStudy</option>
+                            <option value="HyperGraph">HyperGraph</option>
+                            <option value="HyperWorks">HyperWorks</option>
+                            <option value="Inspire">Inspire</option>
+                            <option value="SimLab">SimLab</option>
+                            <option value="MotionView">MotionView</option>
+                            <option value="Flux">Flux</option>
+                            <option value="WinProp">WinProp</option>
+                            <option value="Primer">Primer</option>
+                            <option value="Primer/HyperMesh">Primer/HyperMesh</option>
+                            <option value="CATIA">CATIA</option>
+                            <option value="NX">NX</option>
+                            <option value="SolidWorks">SolidWorks</option>
+                            <option value="Ansys">Ansys</option>
+                            <option value="Excel">Excel</option>
+                            <option value="PowerPoint">PowerPoint</option>
+                            <option value="Python">Python</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Time Spent</label>
+                        <div class="flex gap-2">
+                            <select id="hours" name="hours" class="w-1/2 rounded-lg border border-slate-200 p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                {% for h in range(0, 60) %}
+                                <option value="{{ h }}" {% if h == 8 %}selected{% endif %}>{{ "%02d"|format(h) }} Hours</option>
+                                {% endfor %}
+                            </select>
+                            <select id="minutes" name="minutes" class="w-1/2 rounded-lg border border-slate-200 p-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <option value="00">00 Mins</option>
+                                <option value="15">15 Mins</option>
+                                <option value="30">30 Mins</option>
+                                <option value="45">45 Mins</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 4: Status & Supervisor -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+                        <select id="status" name="status" class="w-full rounded-lg border border-slate-200 p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                            <option value="Completed">Completed</option>
+                            <option value="In Progress">In Progress</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Supervisor</label>
+                        <select id="supervisor" name="supervisor" class="w-full rounded-lg border border-slate-200 p-2.5 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                            <option value="">-- Empty (Add names on right) --</option>
+                            {% for sup in supervisors %}
+                                <option value="{{ sup }}">{{ sup }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" id="submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition duration-200 mt-2">
+                    💾 Save to Excel
+                </button>
+            </form>
+        </div>
+
+        <!-- Right Column: Supervisor Management Panel -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
+            <h2 class="text-lg font-semibold text-slate-900 border-b pb-2">Manage Supervisors</h2>
+
+            <form action="/add_supervisor" method="POST" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Add New Supervisor</label>
+                    <input type="text" name="name" required placeholder="Type supervisor's name..." class="w-full rounded-lg border border-slate-200 p-2.5 focus:border-blue-500 outline-none">
+                </div>
+                <button type="submit" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-lg text-sm border border-slate-300 transition">
+                    + Add to Dropdown
+                </button>
+            </form>
+
+            <div class="mt-4">
+                <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Persisted Supervisor List</label>
+                <div class="border border-slate-100 rounded-lg max-h-48 overflow-y-auto divide-y bg-slate-50">
+                    {% if not supervisors %}
+                        <div class="p-3 text-xs text-slate-400 text-center">List is empty. Add a name above!</div>
+                    {% else %}
+                        {% for sup in supervisors %}
+                            <div class="p-2.5 text-sm text-slate-700 font-medium px-4 flex justify-between items-center group">
+                                <span>{{ sup }}</span>
+                                <form action="/delete/supervisor/{{ sup }}" method="POST" onsubmit="return confirm('Delete supervisor \'{{ sup }}\'?');">
+                                    <button type="submit" class="text-rose-500 hover:text-rose-700 text-xs font-bold opacity-70 hover:opacity-100 transition">Remove</button>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Live Excel View Grid -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-slate-200 flex justify-between items-center">
+            <h2 class="text-lg font-bold text-slate-900">Live Excel Worksheet Viewer</h2>
+            <span class="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">Database Connected</span>
+        </div>
+
+        <div class="overflow-x-auto w-full">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200">
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Start Date</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">End Date</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Project Task</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Description</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Tool</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Hours</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Supervisor</th>
+                        <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% if not logs %}
+                    <tr>
+                        <td colspan="9" class="p-8 text-center text-slate-400 text-sm">No entries logged yet. Try adding one above!</td>
+                    </tr>
+                    {% else %}
+                        {% for index, log in logs %}
+                        <tr class="hover:bg-slate-50/70 transition-colors" id="row-{{ index }}">
+                            <td class="p-4 text-sm text-slate-600 whitespace-nowrap data-start-date">{{ log['Start Date'] }}</td>
+                            <td class="p-4 text-sm text-slate-600 whitespace-nowrap data-end-date">{{ log['End Date'] }}</td>
+                            <td class="p-4 text-sm font-semibold text-slate-900 data-task">{{ log['Project Task'] }}</td>
+                            <td class="p-4 text-sm text-slate-600 max-w-xs truncate data-desc" title="{{ log['Description'] }}">{{ log['Description'] }}</td>
+                            <td class="p-4 text-sm text-slate-600 whitespace-nowrap font-mono data-tool">{{ log['Tool'] }}</td>
+                            <td class="p-4 text-sm text-slate-700 whitespace-nowrap font-semibold data-hours">{{ log['Hours'] }}</td>
+                            <td class="p-4 text-sm whitespace-nowrap data-status" data-value="{{ log['Status'] }}">
+                                {% if log['Status'] == 'Completed' %}
+                                    <span class="inline-flex px-2 py-1 text-xs font-bold rounded-full bg-emerald-100 text-emerald-800">Completed</span>
+                                {% else %}
+                                    <span class="inline-flex px-2 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800">In Progress</span>
+                                {% endif %}
+                            </td>
+                            <td class="p-4 text-sm text-slate-700 whitespace-nowrap font-medium data-supervisor">{{ log['Supervisor'] }}</td>
+                            <td class="p-4 text-sm whitespace-nowrap text-center flex items-center justify-center gap-2">
+                                <button type="button" data-index="{{ index }}" onclick="editRow(this)" class="text-blue-600 hover:text-blue-900 font-bold bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded transition text-xs">
+                                    ✏️ Edit
+                                </button>
+                                <form action="/delete/row/{{ index }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this log row?');">
+                                    <button type="submit" class="text-rose-600 hover:text-rose-900 font-bold bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded transition text-xs">
+                                        🗑️ Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- JavaScript Helper Logics -->
+<script>
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    function resetLogForm() {
+        document.getElementById('row_index').value = "";
+        document.getElementById('start_date').value = todayStr;
+        document.getElementById('end_date').value = todayStr;
+        document.getElementById('task').value = "";
+        document.getElementById('description').value = "";
+        document.getElementById('tool').selectedIndex = 0;
+        document.getElementById('hours').value = "8";
+        document.getElementById('minutes').value = "00";
+        document.getElementById('status').selectedIndex = 0;
+        document.getElementById('supervisor').selectedIndex = 0;
+        
+        document.getElementById('form-title').innerText = "Log Daily Work Details";
+        document.getElementById('submit-btn').innerText = "💾 Save to Excel";
+        document.getElementById('submit-btn').className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-md transition duration-200 mt-2";
+        document.getElementById('cancel-edit-btn').classList.add('hidden');
+    }
+
+    // Set initial configuration
+    resetLogForm();
+
+    // Utility function to convert DD/MM/YYYY text strings securely into HTML standard YYYY-MM-DD
+    function parseToInputDate(dateStr) {
+        if (!dateStr || dateStr === "None" || dateStr.trim() === "" || dateStr.trim() === "-") return null;
+        
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2].trim();
+            return `${year}-${month}-${day}`;
+        }
+        
+        // Native JavaScript parser fallback
+        const parsed = new Date(dateStr);
+        if (!isNaN(parsed.getTime())) {
+            return parsed.toISOString().split('T')[0];
+        }
+        return null;
+    }
+
+    function editRow(buttonElement) {
+        const index = buttonElement.getAttribute('data-index');
+        const row = document.getElementById(`row-${index}`);
+        
+        if (!row) return;
+        
+        // Harvest current text parameters from table fields safely
+        const startDateRaw = row.querySelector('.data-start-date').innerText.trim();
+        const endDateRaw = row.querySelector('.data-end-date').innerText.trim();
+        const task = row.querySelector('.data-task').innerText.trim();
+        const desc = row.querySelector('.data-desc').getAttribute('title') || row.querySelector('.data-desc').innerText.trim();
+        const tool = row.querySelector('.data-tool').innerText.trim();
+        const rawTime = row.querySelector('.data-hours').innerText.trim(); // "HH:MM"
+        const status = row.querySelector('.data-status').getAttribute('data-value').trim();
+        const supervisor = row.querySelector('.data-supervisor').innerText.trim();
+
+        // Convert the dates securely to YYYY-MM-DD format
+        const formattedStartDate = parseToInputDate(startDateRaw);
+        const formattedEndDate = parseToInputDate(endDateRaw);
+
+        // Inject data back down into form controls
+        document.getElementById('row_index').value = index;
+        document.getElementById('start_date').value = formattedStartDate ? formattedStartDate : todayStr;
+        document.getElementById('end_date').value = formattedEndDate ? formattedEndDate : todayStr;
+        document.getElementById('task').value = task;
+        document.getElementById('description').value = desc;
+        document.getElementById('tool').value = tool;
+        
+        if(rawTime && rawTime.includes(':')) {
+            const timeParts = rawTime.split(':');
+            document.getElementById('hours').value = parseInt(timeParts[0]).toString();
+            document.getElementById('minutes').value = timeParts[1];
+        }
+
+        document.getElementById('status').value = status;
+        document.getElementById('supervisor').value = supervisor;
+
+        // Visual transition updating form header context
+        document.getElementById('form-title').innerText = `Editing Row Row #${parseInt(index) + 1}`;
+        document.getElementById('submit-btn').innerText = "🔄 Update Row Entry";
+        document.getElementById('submit-btn').className = "w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-lg shadow-md transition duration-200 mt-2";
+        document.getElementById('cancel-edit-btn').classList.remove('hidden');
+        
+        // Scroll smoothly back up onto interactive panel element
+        document.getElementById('log-form').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function openExcelSheet() {
+        try {
+            const response = await fetch('/open_excel');
+            const data = await response.json();
+            if (data.status !== "success") {
+                alert("Error opening sheet: " + data.message);
+            }
+        } catch (err) {
+            alert("Could not trigger open file process.");
+        }
+    }
+
+    async function copyYesterday() {
+        try {
+            const response = await fetch('/get_last_entry');
+            const lastRow = await response.json();
+
+            if (lastRow && Object.keys(lastRow).length > 0) {
+                if (lastRow["End Date"]) document.getElementById('end_date').value = parseToInputDate(lastRow["End Date"]) || todayStr;
+                if (lastRow["Tool"]) document.getElementById('tool').value = lastRow["Tool"];
+                if (lastRow["Status"]) document.getElementById('status').value = lastRow["Status"];
+                if (lastRow["Supervisor"]) document.getElementById('supervisor').value = lastRow["Supervisor"];
+                alert("Copied yesterday's values successfully!");
+            } else {
+                alert("No previous logs found to copy from.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Failed to grab last entry from backend.");
+        }
+    }
+</script>
+</body>
+</html>
