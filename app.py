@@ -1,9 +1,7 @@
-from flask import Flask, render_template, request, redirect, jsonify
+from flask import Flask, render_template, request, redirect, jsonify, send_file
 import pandas as pd
 import os
 import json
-import subprocess
-import platform
 
 # For Excel styling
 from openpyxl import load_workbook
@@ -220,15 +218,16 @@ def getlastentry():
 @app.route("/open_excel")
 def openexcel():
     try:
-        if platform.system() == "Windows":
-            os.startfile(EXCELFILE)
-        elif platform.system() == "Darwin":  # macOS
-            subprocess.run(["open", EXCELFILE])
-        else:  # Linux
-            subprocess.run(["xdg-open", EXCELFILE])
-        return jsonify({"status": "success"})
+        if os.path.exists(EXCELFILE):
+            # Serves the clean Excel stream so the web viewer can read it remotely
+            return send_file(
+                EXCELFILE,
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        else:
+            return "File not found", 404
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return str(e), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
