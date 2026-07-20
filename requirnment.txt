@@ -2,3 +2,5 @@ Flask
 pandas
 openpyxl
 uuid
+base64
+io
