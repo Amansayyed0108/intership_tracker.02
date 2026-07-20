@@ -276,7 +276,6 @@
             return `${year}-${month}-${day}`;
         }
         
-        // Native JavaScript parser fallback
         const parsed = new Date(dateStr);
         if (!isNaN(parsed.getTime())) {
             return parsed.toISOString().split('T')[0];
@@ -290,7 +289,6 @@
         
         if (!row) return;
         
-        // Harvest current text parameters from table fields safely
         const startDateRaw = row.querySelector('.data-start-date').innerText.trim();
         const endDateRaw = row.querySelector('.data-end-date').innerText.trim();
         const task = row.querySelector('.data-task').innerText.trim();
@@ -300,11 +298,9 @@
         const status = row.querySelector('.data-status').getAttribute('data-value').trim();
         const supervisor = row.querySelector('.data-supervisor').innerText.trim();
 
-        // Convert the dates securely to YYYY-MM-DD format
         const formattedStartDate = parseToInputDate(startDateRaw);
         const formattedEndDate = parseToInputDate(endDateRaw);
 
-        // Inject data back down into form controls
         document.getElementById('row_index').value = index;
         document.getElementById('start_date').value = formattedStartDate ? formattedStartDate : todayStr;
         document.getElementById('end_date').value = formattedEndDate ? formattedEndDate : todayStr;
@@ -321,26 +317,24 @@
         document.getElementById('status').value = status;
         document.getElementById('supervisor').value = supervisor;
 
-        // Visual transition updating form header context
         document.getElementById('form-title').innerText = `Editing Row Row #${parseInt(index) + 1}`;
         document.getElementById('submit-btn').innerText = "🔄 Update Row Entry";
         document.getElementById('submit-btn').className = "w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 rounded-lg shadow-md transition duration-200 mt-2";
         document.getElementById('cancel-edit-btn').classList.remove('hidden');
         
-        // Scroll smoothly back up onto interactive panel element
         document.getElementById('log-form').scrollIntoView({ behavior: 'smooth' });
     }
 
-    async function openExcelSheet() {
-        try {
-            const response = await fetch('/open_excel');
-            const data = await response.json();
-            if (data.status !== "success") {
-                alert("Error opening sheet: " + data.message);
-            }
-        } catch (err) {
-            alert("Could not trigger open file process.");
-        }
+    function openExcelSheet() {
+        // Dynamically catches your Render live URL
+        const currentDomain = window.location.origin;
+        const absoluteFileUrl = `${currentDomain}/open_excel`;
+        
+        // Formats into Microsoft Web Viewer cleanly
+        const webExcelUrl = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(absoluteFileUrl)}`;
+        
+        // Fires it up in a secure new browser window
+        window.open(webExcelUrl, '_blank');
     }
 
     async function copyYesterday() {
