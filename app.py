@@ -2,8 +2,7 @@ from flask import Flask, render_template, request, redirect, jsonify, send_file,
 import pandas as pd
 import os
 import json
-import io
-import base64
+import uuid
 
 # For Excel styling
 from openpyxl import load_workbook
@@ -28,38 +27,24 @@ COLUMNS = [
     "Supervisor"
 ]
 
-# Helper function to get DataFrame and Supervisors directly out of the Client-Side Session
-def load_session_data():
-    # Load Logs Dataframe
-    logs_b64 = session.get('excel_data_b64', '')
-    if logs_b64:
-        try:
-            excel_bytes = base64.b64decode(logs_b64)
-            df = pd.read_excel(io.BytesIO(excel_bytes))
-            # Ensure columns map perfectly
-            for col in COLUMNS:
-                if col not in df.columns:
-                    df[col] = ""
-            df = df[COLUMNS]
-        except Exception:
-            df = pd.DataFrame(columns=COLUMNS)
-    else:
-        df = pd.DataFrame(columns=COLUMNS)
-
-    # Load Supervisors List
-    supervisors = session.get('supervisors_list', [])
-    return df, supervisors
-
-# Helper function to process styling on a raw bytes engine and return clean base64 string
-def style_and_save_session_excel(df):
-    output = io.BytesIO()
+# Helper function to grab unique user storage paths dynamically
+def get_user_filepaths():
+    if 'user_id' not in session:
+        session['user_id'] = str(uuid.uuid4())
     
-    # Initial save to bytes buffer
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False)
+    # Isolate storage for this specific visitor session
+    user_dir = os.path.join(basedir, "userdata", session['user_id'])
+    os.makedirs(user_dir, exist_ok=True)
     
-    output.seek(0)
-    wb = load_workbook(output)
+    excel_file = os.path.join(user_dir, "internshiplog.xlsx")
+    supervisors_file = os.path.join(user_dir, "supervisors.json")
+    return excel_file, supervisors_file
+
+def styleexcel(excel_path):
+    if not os.path.exists(excel_path):
+        return
+
+    wb = load_workbook(excel_path)
     ws = wb.active
 
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
@@ -105,36 +90,63 @@ def style_and_save_session_excel(df):
         clamped_width = min(max(max_len + 4, 12), 45)
         ws.column_dimensions[col_letter].width = clamped_width
 
-    final_output = io.BytesIO()
-    wb.save(final_output)
-    final_output.seek(0)
-    
-    # Store dynamic updates straight back to encrypted cookie memory
-    session['excel_data_b64'] = base64.b64encode(final_output.getvalue()).decode('utf-8')
+    wb.save(excel_path)
+
+def initexcel(excel_path):
+    if not os.path.exists(excel_path):
+        df = pd.DataFrame(columns=COLUMNS)
+        df.to_excel(excel_path, index=False)
+        styleexcel(excel_path)
+    else:
+        try:
+            df = pd.read_excel(excel_path)
+            for col in COLUMNS:
+                if col not in df.columns:
+                    df[col] = ""
+            df.to_excel(excel_path, index=False)
+            styleexcel(excel_path)
+        except Exception:
+            df = pd.DataFrame(columns=COLUMNS)
+            df.to_excel(excel_path, index=False)
+            styleexcel(excel_path)
+
+def loadsupervisors(sups_path):
+    if os.path.exists(sups_path):
+        try:
+            with open(sups_path, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def savesupervisors(sups_list, sups_path):
+    with open(sups_path, 'w') as f:
+        json.dump(sups_list, f)
 
 @app.route("/")
 def home():
-    session.permanent = True  
-    app.permanent_session_lifetime = 31536000 # 1 year persistence window
-
-    df, supervisors = load_session_data()
+    # --- ADD THESE TWO LINES HERE ---
+    session.permanent = True  # Tells the browser to save this session permanently
+    app.permanent_session_lifetime = 31536000 # Keeps it alive for 1 year (in seconds)
+    # --------------------------------
     
-    # Run structural styles if session is blank or empty
-    if 'excel_data_b64' not in session:
-        style_and_save_session_excel(df)
-
+    excel_file, supervisors_file = get_user_filepaths()
+    initexcel(excel_file)
+    
+    df = pd.read_excel(excel_file)
     for col in ["Start Date", "End Date"]:
         if col in df.columns:
             df[col] = df[col].astype(str).replace("NaT", "").replace("nan", "")
 
     logs = df.to_dict(orient="records")
     logs_with_index = list(enumerate(logs))
+    supervisors = loadsupervisors(supervisors_file)
     
     return render_template("index.html", logs=logs_with_index, supervisors=supervisors)
 
 @app.route("/save", methods=["POST"])
 def save():
-    df, _ = load_session_data()
+    excel_file, _ = get_user_filepaths()
     
     row_index_str = request.form.get("row_index", "")
     start_date = request.form.get("start_date", "")
@@ -160,6 +172,8 @@ def save():
         "Supervisor": supervisor
     }
 
+    df = pd.read_excel(excel_file)
+
     if row_index_str != "":
         idx = int(row_index_str)
         if 0 <= idx < len(df):
@@ -168,40 +182,50 @@ def save():
     else:
         df = pd.concat([df, pd.DataFrame([updated_row])], ignore_index=True)
 
-    style_and_save_session_excel(df)
+    df.to_excel(excel_file, index=False)
+    styleexcel(excel_file)
     return redirect("/")
 
 @app.route("/delete/row/<int:index>", methods=["POST"])
 def delete_row(index):
     try:
-        df, _ = load_session_data()
+        excel_file, _ = get_user_filepaths()
+        df = pd.read_excel(excel_file)
         if 0 <= index < len(df):
             df = df.drop(index).reset_index(drop=True)
-            style_and_save_session_excel(df)
+            df.to_excel(excel_file, index=False)
+            styleexcel(excel_file)
     except Exception as e:
         print(f"Error deleting row: {e}")
     return redirect("/")
 
 @app.route("/add_supervisor", methods=["POST"])
 def addsupervisor():
-    _, sups = load_session_data()
+    _, supervisors_file = get_user_filepaths()
     name = request.form.get("name", "").strip()
-    if name and name not in sups:
-        sups.append(name)
-        session['supervisors_list'] = sups
+    if name:
+        sups = loadsupervisors(supervisors_file)
+        if name not in sups:
+            sups.append(name)
+            savesupervisors(sups, supervisors_file)
     return redirect("/")
 
 @app.route("/delete/supervisor/<string:name>", methods=["POST"])
 def delete_supervisor(name):
-    _, sups = load_session_data()
+    _, supervisors_file = get_user_filepaths()
+    sups = loadsupervisors(supervisors_file)
     if name in sups:
         sups.remove(name)
-        session['supervisors_list'] = sups
+        savesupervisors(sups, supervisors_file)
     return redirect("/")
 
 @app.route("/get_last_entry")
 def getlastentry():
-    df, _ = load_session_data()
+    excel_file, _ = get_user_filepaths()
+    if not os.path.exists(excel_file):
+        return jsonify({})
+        
+    df = pd.read_excel(excel_file)
     if not df.empty:
         last_row = df.iloc[-1].fillna("").to_dict()
         return jsonify(last_row)
@@ -210,28 +234,16 @@ def getlastentry():
 @app.route("/open_excel")
 def openexcel():
     try:
-        logs_b64 = session.get('excel_data_b64', '')
-        if logs_b64:
-            excel_bytes = base64.b64decode(logs_b64)
+        excel_file, _ = get_user_filepaths()
+        if os.path.exists(excel_file):
             return send_file(
-                io.BytesIO(excel_bytes),
+                excel_file,
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 as_attachment=True,
                 download_name="internshiplog.xlsx"
             )
         else:
-            # Fallback to building an empty framework sheet instantly
-            df = pd.DataFrame(columns=COLUMNS)
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False)
-            output.seek(0)
-            return send_file(
-                output,
-                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                as_attachment=True,
-                download_name="internshiplog.xlsx"
-            )
+            return "File not found", 404
     except Exception as e:
         return str(e), 500
 
